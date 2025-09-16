@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokémon TCG Sammler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script type="module" src="script.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-content">
+      <h1>Pokémon TCG Sammler</h1>
+      <p>Durchsuche jede Karte, entdecke neue Sets und verwalte deine Sammlung mit Hilfe einer starken Pokémon TCG API.</p>
+    </div>
+    <div class="api-key">
+      <label for="apiKeyInput">API-Schlüssel (optional)</label>
+      <div class="api-key-controls">
+        <input type="text" id="apiKeyInput" placeholder="X-Api-Key hier einfügen">
+        <button id="saveApiKeyButton" class="primary-button">Speichern</button>
+        <button id="clearApiKeyButton" class="secondary">Entfernen</button>
+      </div>
+      <small>Falls du einen eigenen Schlüssel besitzt, erhöht dies das tägliche Limit.</small>
+      <div id="apiKeyFeedback" class="feedback" role="status" aria-live="polite"></div>
+    </div>
+  </header>
+
+  <main>
+    <section id="searchSection" class="panel">
+      <div class="panel-header">
+        <h2>Kartensuche</h2>
+        <p>Nutze die offizielle Pokémon TCG API, um Karten zu finden und deiner Sammlung hinzuzufügen.</p>
+      </div>
+      <form id="searchForm" class="search-form">
+        <div class="form-group">
+          <label for="searchQuery">Name oder Stichwort</label>
+          <input id="searchQuery" name="query" type="search" placeholder="z. B. Pikachu oder Glurak">
+        </div>
+        <div class="form-group">
+          <label for="setFilter">Set</label>
+          <select id="setFilter" name="set">
+            <option value="">Alle Sets</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="typeFilter">Typ</label>
+          <select id="typeFilter" name="type">
+            <option value="">Alle Typen</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="rarityFilter">Seltenheit</label>
+          <select id="rarityFilter" name="rarity">
+            <option value="">Alle Seltenheiten</option>
+          </select>
+        </div>
+        <button type="submit" class="primary-button">Suchen</button>
+      </form>
+      <div id="searchFeedback" class="feedback" role="status" aria-live="polite"></div>
+    </section>
+
+    <section id="setsSection" class="panel">
+      <div class="panel-header">
+        <h2>Aktuelle Sets</h2>
+        <p>Stöbere durch neue und beliebte Sets.</p>
+      </div>
+      <div id="setsGrid" class="set-grid" aria-live="polite"></div>
+    </section>
+
+    <section id="resultsSection" class="panel">
+      <div class="panel-header">
+        <h2>Suchergebnisse</h2>
+        <p>Füge Karten zu deiner Sammlung hinzu oder sieh dir Details an.</p>
+      </div>
+      <div id="resultsGrid" class="card-grid" aria-live="polite"></div>
+    </section>
+
+    <section id="collectionSection" class="panel">
+      <div class="panel-header">
+        <h2>Meine Sammlung</h2>
+        <p>Alles, was du hinzufügst, bleibt lokal auf diesem Gerät gespeichert.</p>
+      </div>
+      <div id="collectionFeedback" class="feedback" role="status" aria-live="polite"></div>
+      <div id="collectionEmptyState" class="empty-state">Noch keine Karten hinzugefügt.</div>
+      <div id="collectionGrid" class="card-grid"></div>
+    </section>
+
+    <section id="scannerSection" class="panel">
+      <div class="panel-header">
+        <h2>Kartenscan</h2>
+        <p>Scanne eine Karte mit deiner Kamera und lasse sie automatisch erkennen.</p>
+      </div>
+      <div class="scanner-controls">
+        <button id="startScannerButton" class="primary-button">Kamera starten</button>
+        <button id="captureCardButton" class="secondary" disabled>Karte erfassen</button>
+        <button id="stopScannerButton" class="secondary" disabled>Stoppen</button>
+      </div>
+      <div class="scanner-view">
+        <video id="scannerVideo" autoplay playsinline muted></video>
+        <canvas id="scannerCanvas" hidden></canvas>
+        <div class="scanner-overlay">Platziere die Karte innerhalb des Rahmens</div>
+      </div>
+      <div id="scannerFeedback" class="feedback" role="status" aria-live="polite"></div>
+      <div id="scannerResults" class="card-grid"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Pokémon und Pokémon TCG sind Marken von Nintendo, Creatures und GAME FREAK. Diese App nutzt die <a href="https://pokemontcg.io" target="_blank" rel="noreferrer">Pokémon TCG API</a>.</p>
+  </footer>
+
+  <template id="cardTemplate">
+    <article class="card">
+      <div class="card-image-wrapper">
+        <img alt="" class="card-image" loading="lazy">
+      </div>
+      <div class="card-body">
+        <h3 class="card-title"></h3>
+        <p class="card-subtitle"></p>
+        <p class="card-meta"></p>
+      </div>
+      <div class="card-actions">
+        <button class="primary-button add-button">Zur Sammlung</button>
+        <a class="secondary details-link" target="_blank" rel="noreferrer">Details</a>
+      </div>
+    </article>
+  </template>
+</body>
+</html>

@@ -12,7 +12,10 @@ const STORAGE_KEYS = {
   wishlist: 'pokefolio.wishlist.v1',
   decks: 'pokefolio.decks.v1',
   settings: 'pokefolio.settings.v1',
-  apiKey: 'pokefolio.apiKey.v1'
+  apiKey: 'pokefolio.apiKey.v1',
+  accounts: 'pokefolio.accounts.v1',
+  session: 'pokefolio.session.v1',
+  emailConfig: 'pokefolio.email-config.v1'
 };
 const DEFAULT_SETTINGS = {
   theme: 'dark',
@@ -25,6 +28,12 @@ const DEFAULT_SETTINGS = {
   priceIntervalDays: 7,
   lastPriceUpdate: null,
   notes: ''
+};
+const DEFAULT_EMAIL_CONFIG = {
+  serviceId: '',
+  templateId: '',
+  publicKey: '',
+  senderName: 'Pokefolio'
 };
 const CONDITION_OPTIONS = [
   { value: 'mint', label: 'Mint' },
@@ -58,6 +67,8 @@ const CATEGORY_LABELS = {
 
 const SEARCH_CACHE_TTL_MS = 1000 * 60 * 5;
 const MAX_SEARCH_CACHE_ENTRIES = 20;
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_HASH_SALT = 'pokefolio-password-salt';
 
 const cardCache = new Map();
 const searchCache = new Map();
@@ -71,6 +82,11 @@ const state = {
   collection: [],
   wishlist: [],
   decks: [],
+  accounts: [],
+  currentUserId: null,
+  emailConfig: { ...DEFAULT_EMAIL_CONFIG },
+  emailClientInitialized: false,
+  accountVerificationResult: null,
   sets: [],
   series: [],
   typeOptions: [],
@@ -94,6 +110,7 @@ init().catch((error) => {
 async function init() {
   cacheDom();
   loadState();
+  await handleVerificationFromUrl();
   applyTheme();
   populateStaticOptions();
   bindGlobalEvents();
@@ -187,6 +204,24 @@ function cacheDom() {
   dom.updatePricesButton = document.getElementById('updatePricesButton');
   dom.resetSettingsButton = document.getElementById('resetSettingsButton');
   dom.clearDataButton = document.getElementById('clearDataButton');
+  dom.accountRegistrationForm = document.getElementById('accountRegistrationForm');
+  dom.accountRegistrationFeedback = document.getElementById('accountRegistrationFeedback');
+  dom.registrationEmail = document.getElementById('registrationEmail');
+  dom.registrationPassword = document.getElementById('registrationPassword');
+  dom.registrationPasswordConfirm = document.getElementById('registrationPasswordConfirm');
+  dom.accountLoginForm = document.getElementById('accountLoginForm');
+  dom.accountLoginFeedback = document.getElementById('accountLoginFeedback');
+  dom.loginEmail = document.getElementById('loginEmail');
+  dom.loginPassword = document.getElementById('loginPassword');
+  dom.accountLogoutButton = document.getElementById('accountLogoutButton');
+  dom.resendVerificationButton = document.getElementById('resendVerificationButton');
+  dom.accountStatus = document.getElementById('accountStatus');
+  dom.emailConfigForm = document.getElementById('emailConfigForm');
+  dom.emailServiceId = document.getElementById('emailServiceId');
+  dom.emailTemplateId = document.getElementById('emailTemplateId');
+  dom.emailPublicKey = document.getElementById('emailPublicKey');
+  dom.emailSenderName = document.getElementById('emailSenderName');
+  dom.emailConfigFeedback = document.getElementById('emailConfigFeedback');
 
   dom.cardEditorDialog = document.getElementById('cardEditorDialog');
   dom.cardEditorForm = document.getElementById('cardEditorForm');
@@ -238,6 +273,9 @@ function loadState() {
   state.collection = loadCollection();
   state.wishlist = loadWishlist();
   state.decks = loadDecks();
+  state.accounts = loadAccounts();
+  state.currentUserId = loadSession();
+  state.emailConfig = loadEmailConfig();
 
   if (dom.apiKeyInput) {
     dom.apiKeyInput.value = state.apiKey;
@@ -253,6 +291,10 @@ function loadState() {
   dom.gbpRateInput.value = state.settings.exchangeRates.GBP ?? '';
   dom.priceIntervalInput.value = state.settings.priceIntervalDays ?? '';
   dom.settingsNotes.value = state.settings.notes ?? '';
+  dom.emailServiceId.value = state.emailConfig.serviceId ?? '';
+  dom.emailTemplateId.value = state.emailConfig.templateId ?? '';
+  dom.emailPublicKey.value = state.emailConfig.publicKey ?? '';
+  dom.emailSenderName.value = state.emailConfig.senderName ?? '';
 }
 
 function populateStaticOptions() {
@@ -366,6 +408,12 @@ function bindGlobalEvents() {
   dom.captureCardButton?.addEventListener('click', captureCard);
   dom.stopScannerButton?.addEventListener('click', stopScanner);
 
+  dom.accountRegistrationForm?.addEventListener('submit', handleAccountRegistrationSubmit);
+  dom.accountLoginForm?.addEventListener('submit', handleAccountLoginSubmit);
+  dom.accountLogoutButton?.addEventListener('click', handleAccountLogout);
+  dom.emailConfigForm?.addEventListener('submit', handleEmailConfigSubmit);
+  dom.resendVerificationButton?.addEventListener('click', handleResendVerification);
+
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (state.settings.theme === 'system') {
       applyTheme();
@@ -381,6 +429,7 @@ function renderAll() {
   renderDeckList();
   renderDeckDetail();
   renderDashboard();
+  renderAccountSection();
   renderDeckPickerOptions();
 }
 
@@ -1783,6 +1832,64 @@ function createDeckActionButton(label, action, cardId, category) {
   return button;
 }
 
+function renderAccountSection() {
+  if (!dom.accountStatus) {
+    return;
+  }
+  const account = getCurrentAccount();
+
+  if (account) {
+    const isVerified = Boolean(account.isVerified);
+    const statusClass = isVerified ? 'status-pill' : 'status-pill is-pending';
+    const statusLabel = isVerified ? 'Verifiziert' : 'Bestätigung ausstehend';
+    const verificationText = isVerified
+      ? 'Dein Konto ist bestätigt. Viel Spaß beim Verwalten deiner Sammlung!'
+      : 'Wir haben dir eine Bestätigungsmail gesendet. Bitte prüfe dein Postfach und bestätige den Link.';
+    let metaInfo = '';
+    if (isVerified) {
+      const formatted = formatDate(account.verifiedAt);
+      metaInfo = formatted ? `Verifiziert am ${formatted}` : '';
+    } else if (account.verificationSentAt) {
+      const formatted = formatDate(account.verificationSentAt);
+      metaInfo = formatted ? `Letzte Mail: ${formatted}` : '';
+    }
+
+    dom.accountStatus.innerHTML = `
+      <div class="account-status-card">
+        <span class="${statusClass}">${statusLabel}</span>
+        <strong>${escapeHtml(account.email)}</strong>
+        <p>${verificationText}</p>
+        ${metaInfo ? `<p class="account-status-meta">${escapeHtml(metaInfo)}</p>` : ''}
+      </div>
+    `;
+    if (dom.accountLogoutButton) {
+      dom.accountLogoutButton.hidden = false;
+    }
+    if (dom.resendVerificationButton) {
+      dom.resendVerificationButton.hidden = isVerified;
+    }
+    if (dom.loginEmail && document.activeElement !== dom.loginEmail) {
+      dom.loginEmail.value = account.email;
+    }
+  } else {
+    dom.accountStatus.innerHTML = '<p class="account-hint">Melde dich an oder registriere dich, um Verifizierungslinks zu erhalten und deine Sammlung zu sichern.</p>';
+    if (dom.accountLogoutButton) {
+      dom.accountLogoutButton.hidden = true;
+    }
+    if (dom.resendVerificationButton) {
+      dom.resendVerificationButton.hidden = true;
+    }
+    if (dom.loginEmail && document.activeElement !== dom.loginEmail) {
+      dom.loginEmail.value = '';
+    }
+  }
+
+  if (state.accountVerificationResult) {
+    setFeedback(dom.accountLoginFeedback, state.accountVerificationResult.message, state.accountVerificationResult.type);
+    state.accountVerificationResult = null;
+  }
+}
+
 function renderDeckPickerOptions() {
   if (!dom.deckPickerSelect) {
     return;
@@ -2231,6 +2338,131 @@ function saveApiKey(key) {
   }
 }
 
+function loadAccounts() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.accounts);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map(normalizeAccount)
+      .filter((account) => account);
+  } catch (error) {
+    console.warn('Konnte Konten nicht laden.', error);
+    return [];
+  }
+}
+
+function saveAccounts() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(state.accounts));
+  } catch (error) {
+    console.warn('Konnte Konten nicht speichern.', error);
+  }
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.session);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.currentUserId === 'string') {
+      const exists = state.accounts.some((account) => account.id === parsed.currentUserId);
+      if (exists) {
+        return parsed.currentUserId;
+      }
+      localStorage.removeItem(STORAGE_KEYS.session);
+    }
+    return null;
+  } catch (error) {
+    console.warn('Konnte Sitzung nicht laden.', error);
+    return null;
+  }
+}
+
+function saveSession() {
+  try {
+    if (state.currentUserId) {
+      localStorage.setItem(STORAGE_KEYS.session, JSON.stringify({ currentUserId: state.currentUserId }));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.session);
+    }
+  } catch (error) {
+    console.warn('Konnte Sitzung nicht speichern.', error);
+  }
+}
+
+function loadEmailConfig() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.emailConfig);
+    if (!raw) {
+      return { ...DEFAULT_EMAIL_CONFIG };
+    }
+    const parsed = JSON.parse(raw);
+    return normalizeEmailConfig(parsed);
+  } catch (error) {
+    console.warn('Konnte E-Mail Einstellungen nicht laden.', error);
+    return { ...DEFAULT_EMAIL_CONFIG };
+  }
+}
+
+function saveEmailConfig() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.emailConfig, JSON.stringify(state.emailConfig));
+  } catch (error) {
+    console.warn('Konnte E-Mail Einstellungen nicht speichern.', error);
+  }
+}
+
+function normalizeAccount(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const email = typeof entry.email === 'string' ? entry.email.trim().toLowerCase() : '';
+  const passwordHash = typeof entry.passwordHash === 'string' ? entry.passwordHash : '';
+  if (!email || !passwordHash) {
+    return null;
+  }
+  const hasCryptoUUID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function';
+  const id = typeof entry.id === 'string' && entry.id
+    ? entry.id
+    : hasCryptoUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const createdAt = entry.createdAt ?? new Date().toISOString();
+  const updatedAt = entry.updatedAt ?? createdAt;
+  const isVerified = Boolean(entry.isVerified);
+  return {
+    id,
+    email,
+    passwordHash,
+    createdAt,
+    updatedAt,
+    isVerified,
+    verificationToken: entry.verificationToken ?? null,
+    verificationSentAt: entry.verificationSentAt ?? null,
+    verifiedAt: entry.verifiedAt ?? (isVerified ? entry.verifiedAt ?? updatedAt ?? createdAt : null)
+  };
+}
+
+function normalizeEmailConfig(config) {
+  if (!config || typeof config !== 'object') {
+    return { ...DEFAULT_EMAIL_CONFIG };
+  }
+  return {
+    serviceId: (config.serviceId ?? '').toString().trim(),
+    templateId: (config.templateId ?? '').toString().trim(),
+    publicKey: (config.publicKey ?? '').toString().trim(),
+    senderName: (config.senderName ?? '').toString().trim() || DEFAULT_EMAIL_CONFIG.senderName
+  };
+}
+
 function normalizeCollectionEntry(entry) {
   return {
     id: entry.id,
@@ -2379,6 +2611,353 @@ function resetSettings() {
   setFeedback(dom.settingsFeedback, 'Einstellungen zurückgesetzt.', 'success');
 }
 
+async function handleAccountRegistrationSubmit(event) {
+  event.preventDefault();
+  if (!dom.accountRegistrationForm || !dom.accountRegistrationFeedback) {
+    return;
+  }
+  setFeedback(dom.accountRegistrationFeedback, '');
+  const form = event.currentTarget instanceof HTMLFormElement ? event.currentTarget : dom.accountRegistrationForm;
+  const formData = new FormData(form);
+  const email = (formData.get('email') ?? '').toString().trim().toLowerCase();
+  const password = (formData.get('password') ?? '').toString();
+  const passwordConfirm = (formData.get('passwordConfirm') ?? '').toString();
+
+  if (!email) {
+    setFeedback(dom.accountRegistrationFeedback, 'Bitte eine E-Mail-Adresse eingeben.', 'error');
+    return;
+  }
+  if (!isValidEmail(email)) {
+    setFeedback(dom.accountRegistrationFeedback, 'Bitte eine gültige E-Mail-Adresse eingeben.', 'error');
+    return;
+  }
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    setFeedback(
+      dom.accountRegistrationFeedback,
+      `Das Passwort muss mindestens ${PASSWORD_MIN_LENGTH} Zeichen lang sein.`,
+      'error'
+    );
+    return;
+  }
+  if (password !== passwordConfirm) {
+    setFeedback(dom.accountRegistrationFeedback, 'Die Passwörter stimmen nicht überein.', 'error');
+    return;
+  }
+  if (getAccountByEmail(email)) {
+    setFeedback(dom.accountRegistrationFeedback, 'Für diese E-Mail-Adresse existiert bereits ein Konto.', 'error');
+    return;
+  }
+
+  try {
+    const passwordHash = await hashPassword(password);
+    const timestamp = new Date().toISOString();
+    const hasCryptoUUID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function';
+    const account = {
+      id: hasCryptoUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      email,
+      passwordHash,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      isVerified: false,
+      verificationToken: generateVerificationToken(),
+      verificationSentAt: null,
+      verifiedAt: null
+    };
+    state.accounts.push(account);
+    saveAccounts();
+    setCurrentUser(account.id);
+    form.reset();
+    if (dom.registrationPassword) {
+      dom.registrationPassword.value = '';
+    }
+    if (dom.registrationPasswordConfirm) {
+      dom.registrationPasswordConfirm.value = '';
+    }
+    if (dom.loginEmail && document.activeElement !== dom.loginEmail) {
+      dom.loginEmail.value = email;
+    }
+    if (dom.loginPassword) {
+      dom.loginPassword.value = '';
+    }
+    setFeedback(dom.accountRegistrationFeedback, 'Konto erstellt. Wir senden dir gleich eine Bestätigungsmail.', 'success');
+    renderAccountSection();
+    const sent = await sendVerificationEmail(account.id);
+    if (sent) {
+      setFeedback(dom.accountLoginFeedback, 'Bestätigungsmail wurde versendet. Bitte prüfe dein Postfach.', 'success');
+      renderAccountSection();
+    } else {
+      setFeedback(
+        dom.accountLoginFeedback,
+        'Konto angelegt. Bitte hinterlege gültige E-Mail-Einstellungen, um die Bestätigungsmail zu verschicken.',
+        'error'
+      );
+    }
+  } catch (error) {
+    console.error('Registrierung fehlgeschlagen', error);
+    setFeedback(dom.accountRegistrationFeedback, `Die Registrierung ist fehlgeschlagen: ${getErrorMessage(error)}`, 'error');
+  }
+}
+
+async function handleAccountLoginSubmit(event) {
+  event.preventDefault();
+  if (!dom.accountLoginForm || !dom.accountLoginFeedback) {
+    return;
+  }
+  setFeedback(dom.accountLoginFeedback, '');
+  const form = event.currentTarget instanceof HTMLFormElement ? event.currentTarget : dom.accountLoginForm;
+  const formData = new FormData(form);
+  const email = (formData.get('email') ?? '').toString().trim().toLowerCase();
+  const password = (formData.get('password') ?? '').toString();
+
+  if (!email) {
+    setFeedback(dom.accountLoginFeedback, 'Bitte eine E-Mail-Adresse eingeben.', 'error');
+    return;
+  }
+  if (!isValidEmail(email)) {
+    setFeedback(dom.accountLoginFeedback, 'Bitte eine gültige E-Mail-Adresse eingeben.', 'error');
+    return;
+  }
+  const account = getAccountByEmail(email);
+  if (!account) {
+    setFeedback(dom.accountLoginFeedback, 'Für diese E-Mail-Adresse wurde kein Konto gefunden.', 'error');
+    return;
+  }
+
+  try {
+    const passwordHash = await hashPassword(password);
+    if (account.passwordHash !== passwordHash) {
+      setFeedback(dom.accountLoginFeedback, 'Das Passwort ist nicht korrekt.', 'error');
+      return;
+    }
+    setCurrentUser(account.id);
+    if (dom.loginPassword) {
+      dom.loginPassword.value = '';
+    }
+    renderAccountSection();
+    const message = account.isVerified
+      ? 'Erfolgreich angemeldet.'
+      : 'Erfolgreich angemeldet. Bitte bestätige deine E-Mail-Adresse über den zugesandten Link.';
+    setFeedback(dom.accountLoginFeedback, message, 'success');
+  } catch (error) {
+    console.error('Anmeldung fehlgeschlagen', error);
+    setFeedback(dom.accountLoginFeedback, `Anmeldung fehlgeschlagen: ${getErrorMessage(error)}`, 'error');
+  }
+}
+
+function handleAccountLogout() {
+  setCurrentUser(null);
+  if (dom.loginPassword) {
+    dom.loginPassword.value = '';
+  }
+  renderAccountSection();
+  setFeedback(dom.accountLoginFeedback, 'Abmeldung erfolgreich.', 'success');
+}
+
+function handleEmailConfigSubmit(event) {
+  event.preventDefault();
+  if (!dom.emailConfigForm || !dom.emailConfigFeedback) {
+    return;
+  }
+  const form = event.currentTarget instanceof HTMLFormElement ? event.currentTarget : dom.emailConfigForm;
+  const formData = new FormData(form);
+  const config = {
+    serviceId: (formData.get('serviceId') ?? '').toString().trim(),
+    templateId: (formData.get('templateId') ?? '').toString().trim(),
+    publicKey: (formData.get('publicKey') ?? '').toString().trim(),
+    senderName: (formData.get('senderName') ?? '').toString().trim() || DEFAULT_EMAIL_CONFIG.senderName
+  };
+
+  if (!config.serviceId || !config.templateId || !config.publicKey) {
+    setFeedback(dom.emailConfigFeedback, 'Bitte fülle alle erforderlichen Felder aus.', 'error');
+    return;
+  }
+
+  state.emailConfig = config;
+  state.emailClientInitialized = false;
+  saveEmailConfig();
+  setFeedback(dom.emailConfigFeedback, 'E-Mail Einstellungen gespeichert.', 'success');
+}
+
+async function handleResendVerification() {
+  const account = getCurrentAccount();
+  if (!account) {
+    setFeedback(dom.accountLoginFeedback, 'Bitte melde dich zuerst an.', 'error');
+    return;
+  }
+  if (account.isVerified) {
+    setFeedback(dom.accountLoginFeedback, 'Deine E-Mail-Adresse ist bereits bestätigt.', 'success');
+    return;
+  }
+  updateAccount(account.id, { verificationToken: generateVerificationToken() });
+  const sent = await sendVerificationEmail(account.id);
+  if (sent) {
+    setFeedback(dom.accountLoginFeedback, 'Wir haben dir die Bestätigungsmail erneut gesendet.', 'success');
+    renderAccountSection();
+  } else {
+    setFeedback(
+      dom.accountLoginFeedback,
+      'Die Bestätigungsmail konnte nicht gesendet werden. Bitte prüfe die E-Mail Einstellungen.',
+      'error'
+    );
+  }
+}
+
+function getCurrentAccount() {
+  if (!state.currentUserId) {
+    return null;
+  }
+  return getAccountById(state.currentUserId);
+}
+
+function getAccountById(accountId) {
+  if (!accountId) {
+    return null;
+  }
+  return state.accounts.find((entry) => entry.id === accountId) ?? null;
+}
+
+function getAccountByEmail(email) {
+  if (!email) {
+    return null;
+  }
+  return state.accounts.find((entry) => entry.email === email) ?? null;
+}
+
+function setCurrentUser(accountId) {
+  state.currentUserId = accountId ?? null;
+  saveSession();
+}
+
+function updateAccount(accountId, updates) {
+  const index = state.accounts.findIndex((entry) => entry.id === accountId);
+  if (index === -1) {
+    return null;
+  }
+  const updated = {
+    ...state.accounts[index],
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+  state.accounts[index] = updated;
+  saveAccounts();
+  return updated;
+}
+
+function isEmailConfigComplete() {
+  return Boolean(state.emailConfig.serviceId && state.emailConfig.templateId && state.emailConfig.publicKey);
+}
+
+async function ensureEmailClientInitialized() {
+  if (!isEmailConfigComplete()) {
+    throw new Error('E-Mail-Konfiguration ist unvollständig.');
+  }
+  if (!window.emailjs) {
+    throw new Error('E-Mail Dienst konnte nicht geladen werden.');
+  }
+  if (!state.emailClientInitialized) {
+    window.emailjs.init(state.emailConfig.publicKey);
+    state.emailClientInitialized = true;
+  }
+}
+
+async function sendVerificationEmail(accountId) {
+  const account = getAccountById(accountId);
+  if (!account) {
+    return false;
+  }
+  if (!isEmailConfigComplete()) {
+    setFeedback(dom.emailConfigFeedback, 'Bitte hinterlege deine EmailJS-Daten, um E-Mails versenden zu können.', 'error');
+    return false;
+  }
+
+  let token = account.verificationToken;
+  if (!token) {
+    const updated = updateAccount(account.id, { verificationToken: generateVerificationToken() });
+    token = updated?.verificationToken ?? token;
+  }
+  const verificationUrl = generateVerificationUrl(token);
+  const templateParams = {
+    to_email: account.email,
+    verification_url: verificationUrl,
+    to_name: account.email.split('@')[0] || account.email,
+    sender_name: state.emailConfig.senderName || DEFAULT_EMAIL_CONFIG.senderName
+  };
+
+  try {
+    await ensureEmailClientInitialized();
+    await window.emailjs.send(state.emailConfig.serviceId, state.emailConfig.templateId, templateParams);
+    updateAccount(account.id, { verificationSentAt: new Date().toISOString() });
+    return true;
+  } catch (error) {
+    console.error('Bestätigungsmail konnte nicht versendet werden', error);
+    setFeedback(dom.emailConfigFeedback, `Bestätigungsmail konnte nicht versendet werden: ${getErrorMessage(error)}`, 'error');
+    return false;
+  }
+}
+
+function generateVerificationToken() {
+  const hasCryptoUUID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function';
+  if (hasCryptoUUID) {
+    return crypto.randomUUID().replace(/-/g, '');
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+}
+
+function generateVerificationUrl(token) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('verify', token);
+  url.hash = '';
+  return url.toString();
+}
+
+async function hashPassword(password) {
+  try {
+    const hasSubtle = typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function';
+    if (!hasSubtle) {
+      return `${PASSWORD_HASH_SALT}:${password}`;
+    }
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${PASSWORD_HASH_SALT}:${password}`);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
+  } catch (error) {
+    console.error('Passworthash fehlgeschlagen', error);
+    return `${PASSWORD_HASH_SALT}:${password}`;
+  }
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+async function handleVerificationFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('verify');
+  if (!token) {
+    return;
+  }
+
+  params.delete('verify');
+  const newQuery = params.toString();
+  const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}${window.location.hash}`;
+  window.history.replaceState({}, document.title, newUrl);
+
+  const account = state.accounts.find((entry) => entry.verificationToken === token);
+  if (!account) {
+    state.accountVerificationResult = {
+      type: 'error',
+      message: 'Der Verifizierungslink ist ungültig oder wurde bereits verwendet.'
+    };
+    return;
+  }
+
+  updateAccount(account.id, { isVerified: true, verifiedAt: new Date().toISOString(), verificationToken: null });
+  setCurrentUser(account.id);
+  state.accountVerificationResult = { type: 'success', message: 'E-Mail-Adresse erfolgreich bestätigt.' };
+}
+
 function clearAllData() {
   if (!confirm('Möchtest du wirklich alle Daten löschen? Dies kann nicht rückgängig gemacht werden.')) {
     return;
@@ -2386,6 +2965,11 @@ function clearAllData() {
   state.collection = [];
   state.wishlist = [];
   state.decks = [];
+  state.accounts = [];
+  state.currentUserId = null;
+  state.emailConfig = { ...DEFAULT_EMAIL_CONFIG };
+  state.emailClientInitialized = false;
+  state.accountVerificationResult = null;
   state.settings = { ...DEFAULT_SETTINGS };
   state.selectedDeckId = null;
   state.searchResults = [];
@@ -2400,7 +2984,22 @@ function clearAllData() {
   saveWishlist();
   saveDecks();
   saveSettings();
+  saveAccounts();
+  saveSession();
+  saveEmailConfig();
   localStorage.removeItem(STORAGE_KEYS.apiKey);
+  if (dom.emailServiceId) {
+    dom.emailServiceId.value = state.emailConfig.serviceId ?? '';
+  }
+  if (dom.emailTemplateId) {
+    dom.emailTemplateId.value = state.emailConfig.templateId ?? '';
+  }
+  if (dom.emailPublicKey) {
+    dom.emailPublicKey.value = state.emailConfig.publicKey ?? '';
+  }
+  if (dom.emailSenderName) {
+    dom.emailSenderName.value = state.emailConfig.senderName ?? '';
+  }
   renderAll();
   setFeedback(dom.settingsFeedback, 'Alle Daten wurden gelöscht.', 'success');
 }

@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script type="module" src="script.js" defer></script>
 </head>
 <body>
@@ -353,6 +354,75 @@
           <button id="clearDataButton" type="button" class="secondary danger">Alle Daten löschen</button>
         </div>
         <div id="settingsFeedback" class="feedback" role="status" aria-live="polite"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Konto &amp; Sicherheit</h2>
+          <p>Registriere ein Konto, verwalte deine Anmeldung und bestätige deine E-Mail-Adresse.</p>
+        </div>
+        <div class="account-layout">
+          <section class="account-section">
+            <h3>Registrierung</h3>
+            <form id="accountRegistrationForm" class="account-form">
+              <label class="form-row">
+                <span>E-Mail-Adresse</span>
+                <input type="email" id="registrationEmail" name="email" placeholder="du@example.com" autocomplete="email" required>
+              </label>
+              <label class="form-row">
+                <span>Passwort</span>
+                <input type="password" id="registrationPassword" name="password" minlength="8" autocomplete="new-password" required>
+              </label>
+              <label class="form-row">
+                <span>Passwort bestätigen</span>
+                <input type="password" id="registrationPasswordConfirm" name="passwordConfirm" minlength="8" autocomplete="new-password" required>
+              </label>
+              <button type="submit" class="primary-button">Konto erstellen</button>
+            </form>
+            <div id="accountRegistrationFeedback" class="feedback" role="status" aria-live="polite"></div>
+          </section>
+          <section class="account-section">
+            <h3>Anmeldung</h3>
+            <form id="accountLoginForm" class="account-form">
+              <label class="form-row">
+                <span>E-Mail-Adresse</span>
+                <input type="email" id="loginEmail" name="email" placeholder="du@example.com" autocomplete="email" required>
+              </label>
+              <label class="form-row">
+                <span>Passwort</span>
+                <input type="password" id="loginPassword" name="password" autocomplete="current-password" required>
+              </label>
+              <button type="submit" class="primary-button">Anmelden</button>
+            </form>
+            <button id="accountLogoutButton" type="button" class="secondary" hidden>Abmelden</button>
+            <button id="resendVerificationButton" type="button" class="secondary" hidden>Bestätigungsmail erneut senden</button>
+            <div id="accountLoginFeedback" class="feedback" role="status" aria-live="polite"></div>
+            <div id="accountStatus" class="account-status" aria-live="polite"></div>
+          </section>
+          <section class="account-section">
+            <h3>E-Mail Versand</h3>
+            <p class="account-hint">Hinterlege deine EmailJS-Daten. Sie werden ausschließlich lokal gespeichert und für Bestätigungsmails genutzt.</p>
+            <form id="emailConfigForm" class="account-form">
+              <label class="form-row">
+                <span>Service ID</span>
+                <input type="text" id="emailServiceId" name="serviceId" autocomplete="off" required>
+              </label>
+              <label class="form-row">
+                <span>Template ID</span>
+                <input type="text" id="emailTemplateId" name="templateId" autocomplete="off" required>
+              </label>
+              <label class="form-row">
+                <span>Public Key</span>
+                <input type="text" id="emailPublicKey" name="publicKey" autocomplete="off" required>
+              </label>
+              <label class="form-row">
+                <span>Absendername</span>
+                <input type="text" id="emailSenderName" name="senderName" placeholder="Pokefolio" autocomplete="off">
+              </label>
+              <button type="submit" class="secondary">E-Mail Einstellungen speichern</button>
+            </form>
+            <div id="emailConfigFeedback" class="feedback" role="status" aria-live="polite"></div>
+          </section>
+        </div>
       </article>
     </section>
   </main>

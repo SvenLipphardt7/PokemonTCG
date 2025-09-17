@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pokémon TCG Sammler</title>
+  <title>Pokefolio – Pokémon TCG Sammlung</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -13,121 +13,569 @@
 </head>
 <body>
   <header class="app-header">
-    <div class="header-content">
-      <h1>Pokémon TCG Sammler</h1>
-      <p>Durchsuche jede Karte, entdecke neue Sets und verwalte deine Sammlung mit Hilfe einer starken Pokémon TCG API.</p>
+    <div class="branding">
+      <h1>Pokefolio</h1>
+      <p>Die Komplettlösung für deine Pokémon TCG Sammlung, Preise, Wunschlisten und Decks.</p>
     </div>
-    <div class="api-key">
-      <label for="apiKeyInput">API-Schlüssel (optional)</label>
-      <div class="api-key-controls">
-        <input type="text" id="apiKeyInput" placeholder="X-Api-Key hier einfügen">
-        <button id="saveApiKeyButton" class="primary-button">Speichern</button>
-        <button id="clearApiKeyButton" class="secondary">Entfernen</button>
+    <div class="header-actions">
+      <div class="api-key">
+        <label for="apiKeyInput">Pokémon TCG API-Schlüssel</label>
+        <div class="api-key-controls">
+          <input type="text" id="apiKeyInput" placeholder="Optionaler API-Schlüssel für höhere Limits">
+          <button id="saveApiKeyButton" class="primary-button" type="button">Speichern</button>
+          <button id="clearApiKeyButton" class="secondary" type="button">Entfernen</button>
+        </div>
+        <small>Ohne Schlüssel gelten die öffentlichen Limits. Ein persönlicher Key erhöht die täglichen Anfragen.</small>
+        <div id="apiKeyFeedback" class="feedback" role="status" aria-live="polite"></div>
       </div>
-      <small>Falls du einen eigenen Schlüssel besitzt, erhöht dies das tägliche Limit.</small>
-      <div id="apiKeyFeedback" class="feedback" role="status" aria-live="polite"></div>
     </div>
+    <nav class="main-nav" aria-label="Hauptnavigation">
+      <button class="nav-button is-active" type="button" data-section="search">Suche &amp; Scanner</button>
+      <button class="nav-button" type="button" data-section="collection">Sammlung</button>
+      <button class="nav-button" type="button" data-section="dashboard">Dashboard</button>
+      <button class="nav-button" type="button" data-section="wishlist">Wunschliste</button>
+      <button class="nav-button" type="button" data-section="deck">Deck-Builder</button>
+      <button class="nav-button" type="button" data-section="export">Export &amp; Backups</button>
+      <button class="nav-button" type="button" data-section="settings">Einstellungen</button>
+    </nav>
   </header>
 
   <main>
-    <section id="searchSection" class="panel">
-      <div class="panel-header">
-        <h2>Kartensuche</h2>
-        <p>Nutze die offizielle Pokémon TCG API, um Karten zu finden und deiner Sammlung hinzuzufügen.</p>
-      </div>
-      <form id="searchForm" class="search-form">
-        <div class="form-group">
-          <label for="searchQuery">Name oder Stichwort</label>
-          <input id="searchQuery" name="query" type="search" placeholder="z. B. Pikachu oder Glurak">
+    <section id="searchSection" class="view is-active" data-section="search">
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Kartensuche</h2>
+          <p>Durchsuche die komplette Datenbank nach Namen, Sets, Typen oder Seltenheiten.</p>
         </div>
-        <div class="form-group">
-          <label for="setFilter">Set</label>
-          <select id="setFilter" name="set">
-            <option value="">Alle Sets</option>
-          </select>
+        <form id="searchForm" class="search-form">
+          <div class="form-row">
+            <label for="searchQuery">Name oder Stichwort</label>
+            <input id="searchQuery" name="query" type="search" placeholder="z. B. Glurak, Pikachu VMAX oder Trainer" autocomplete="off">
+          </div>
+          <div class="filter-grid">
+            <label class="form-row">
+              <span>Set</span>
+              <select id="setFilter" name="set">
+                <option value="">Alle Sets</option>
+              </select>
+            </label>
+            <label class="form-row">
+              <span>Serie</span>
+              <select id="seriesFilter" name="series">
+                <option value="">Alle Serien</option>
+              </select>
+            </label>
+            <label class="form-row">
+              <span>Typ</span>
+              <select id="typeFilter" name="type">
+                <option value="">Alle Typen</option>
+              </select>
+            </label>
+            <label class="form-row">
+              <span>Supertype</span>
+              <select id="supertypeFilter" name="supertype">
+                <option value="">Alle</option>
+              </select>
+            </label>
+            <label class="form-row">
+              <span>Seltenheit</span>
+              <select id="rarityFilter" name="rarity">
+                <option value="">Alle Seltenheiten</option>
+              </select>
+            </label>
+            <label class="form-row">
+              <span>Regulationsmarke</span>
+              <select id="regulationFilter" name="regulation">
+                <option value="">Alle</option>
+              </select>
+            </label>
+            <label class="form-row">
+              <span>Illustrator</span>
+              <input id="artistFilter" name="artist" type="text" placeholder="Name des Illustrators">
+            </label>
+            <label class="form-row">
+              <span>Jahr</span>
+              <input id="yearFilter" name="year" type="number" min="1996" max="2099" step="1" placeholder="z. B. 1999">
+            </label>
+            <label class="form-row">
+              <span>Sortierung</span>
+              <select id="sortOrder" name="sort">
+                <option value="name">Name (A→Z)</option>
+                <option value="-name">Name (Z→A)</option>
+                <option value="set.releaseDate">Release Datum (aufsteigend)</option>
+                <option value="-set.releaseDate">Release Datum (absteigend)</option>
+                <option value="set">Set</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary-button">Suchen</button>
+            <button type="reset" class="secondary" id="resetSearchButton">Zurücksetzen</button>
+          </div>
+        </form>
+        <div id="searchFeedback" class="feedback" role="status" aria-live="polite"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Suchergebnisse</h2>
+          <p>Füge Karten zur Sammlung, Wunschliste oder direkt zu einem Deck hinzu.</p>
         </div>
-        <div class="form-group">
-          <label for="typeFilter">Typ</label>
-          <select id="typeFilter" name="type">
-            <option value="">Alle Typen</option>
-          </select>
+        <div id="resultsGrid" class="card-grid" aria-live="polite"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Aktuelle Sets &amp; Releases</h2>
+          <p>Neue, beliebte und zuletzt erschienene Sets im Überblick.</p>
         </div>
-        <div class="form-group">
-          <label for="rarityFilter">Seltenheit</label>
-          <select id="rarityFilter" name="rarity">
-            <option value="">Alle Seltenheiten</option>
-          </select>
+        <div id="setsGrid" class="set-grid" aria-live="polite"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Kartenscanner</h2>
+          <p>Nutze die Kamera für OCR-gestützte Texterkennung. Beste Ergebnisse mit guter Ausleuchtung.</p>
         </div>
-        <button type="submit" class="primary-button">Suchen</button>
-      </form>
-      <div id="searchFeedback" class="feedback" role="status" aria-live="polite"></div>
+        <div class="scanner-controls">
+          <button id="startScannerButton" type="button" class="primary-button">Kamera starten</button>
+          <button id="captureCardButton" type="button" class="secondary" disabled>Karte erkennen</button>
+          <button id="stopScannerButton" type="button" class="secondary" disabled>Stoppen</button>
+        </div>
+        <div class="scanner-view">
+          <video id="scannerVideo" autoplay playsinline muted></video>
+          <canvas id="scannerCanvas" hidden></canvas>
+          <div class="scanner-overlay">Halte die Karte ruhig im Rahmen</div>
+        </div>
+        <div id="scannerFeedback" class="feedback" role="status" aria-live="polite"></div>
+        <div id="scannerResults" class="card-grid"></div>
+      </article>
     </section>
 
-    <section id="setsSection" class="panel">
-      <div class="panel-header">
-        <h2>Aktuelle Sets</h2>
-        <p>Stöbere durch neue und beliebte Sets.</p>
-      </div>
-      <div id="setsGrid" class="set-grid" aria-live="polite"></div>
+    <section id="collectionSection" class="view" data-section="collection" hidden>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Meine Sammlung</h2>
+          <p>Verwalte Karten, Zustände, Kaufpreise und Werte. Alle Daten bleiben lokal gespeichert.</p>
+        </div>
+        <form id="collectionFilterForm" class="filter-grid">
+          <label class="form-row">
+            <span>Set</span>
+            <select id="collectionSetFilter" name="set">
+              <option value="">Alle</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Serie</span>
+            <select id="collectionSeriesFilter" name="series">
+              <option value="">Alle</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Seltenheit</span>
+            <select id="collectionRarityFilter" name="rarity">
+              <option value="">Alle</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Typ</span>
+            <select id="collectionTypeFilter" name="type">
+              <option value="">Alle</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Zustand</span>
+            <select id="collectionConditionFilter" name="condition">
+              <option value="">Alle</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Sprache</span>
+            <select id="collectionLanguageFilter" name="language">
+              <option value="">Alle</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Sortierung</span>
+            <select id="collectionSort" name="sort">
+              <option value="name">Name</option>
+              <option value="-value">Wert (absteigend)</option>
+              <option value="value">Wert (aufsteigend)</option>
+              <option value="set">Set &amp; Nummer</option>
+              <option value="added">Zuletzt hinzugefügt</option>
+            </select>
+          </label>
+        </form>
+        <div id="collectionSummary" class="summary-grid"></div>
+        <div id="collectionFeedback" class="feedback" role="status" aria-live="polite"></div>
+        <div id="collectionEmptyState" class="empty-state">Noch keine Karten hinzugefügt.</div>
+        <div id="collectionGrid" class="card-grid"></div>
+      </article>
     </section>
 
-    <section id="resultsSection" class="panel">
-      <div class="panel-header">
-        <h2>Suchergebnisse</h2>
-        <p>Füge Karten zu deiner Sammlung hinzu oder sieh dir Details an.</p>
-      </div>
-      <div id="resultsGrid" class="card-grid" aria-live="polite"></div>
+    <section id="dashboardSection" class="view" data-section="dashboard" hidden>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Sammlungs-Dashboard</h2>
+          <p>Überblick über Gesamtwert, Fortschritt je Set, Zustände und Raritäten.</p>
+        </div>
+        <div id="dashboardOverview" class="summary-grid"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-header">
+          <h3>Set-Fortschritt</h3>
+          <p>Vergleiche deine Sammlung mit der Gesamtgröße der Sets.</p>
+        </div>
+        <div id="setProgressList" class="progress-list"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-header">
+          <h3>Raritäts- und Zustandsverteilung</h3>
+        </div>
+        <div id="rarityDistribution" class="progress-list"></div>
+        <div id="conditionDistribution" class="progress-list"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-header">
+          <h3>Preisalarme &amp; Hinweise</h3>
+        </div>
+        <div id="alertsList" class="alerts-list" aria-live="polite"></div>
+      </article>
     </section>
 
-    <section id="collectionSection" class="panel">
-      <div class="panel-header">
-        <h2>Meine Sammlung</h2>
-        <p>Alles, was du hinzufügst, bleibt lokal auf diesem Gerät gespeichert.</p>
-      </div>
-      <div id="collectionFeedback" class="feedback" role="status" aria-live="polite"></div>
-      <div id="collectionEmptyState" class="empty-state">Noch keine Karten hinzugefügt.</div>
-      <div id="collectionGrid" class="card-grid"></div>
+    <section id="wishlistSection" class="view" data-section="wishlist" hidden>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Wunschliste</h2>
+          <p>Behalte Karten im Blick, setze Zielpreise und erkenne Deals auf einen Blick.</p>
+        </div>
+        <div id="wishlistFeedback" class="feedback" role="status" aria-live="polite"></div>
+        <div id="wishlistEmptyState" class="empty-state">Noch keine Karten auf der Wunschliste.</div>
+        <div id="wishlistGrid" class="card-grid"></div>
+      </article>
     </section>
 
-    <section id="scannerSection" class="panel">
-      <div class="panel-header">
-        <h2>Kartenscan</h2>
-        <p>Scanne eine Karte mit deiner Kamera und lasse sie automatisch erkennen.</p>
-      </div>
-      <div class="scanner-controls">
-        <button id="startScannerButton" class="primary-button">Kamera starten</button>
-        <button id="captureCardButton" class="secondary" disabled>Karte erfassen</button>
-        <button id="stopScannerButton" class="secondary" disabled>Stoppen</button>
-      </div>
-      <div class="scanner-view">
-        <video id="scannerVideo" autoplay playsinline muted></video>
-        <canvas id="scannerCanvas" hidden></canvas>
-        <div class="scanner-overlay">Platziere die Karte innerhalb des Rahmens</div>
-      </div>
-      <div id="scannerFeedback" class="feedback" role="status" aria-live="polite"></div>
-      <div id="scannerResults" class="card-grid"></div>
+    <section id="deckSection" class="view" data-section="deck" hidden>
+      <article class="panel deck-panel">
+        <div class="panel-header">
+          <h2>Deck-Builder</h2>
+          <p>Erstelle Decks, prüfe Format-Regeln und exportiere Listen.</p>
+        </div>
+        <div class="deck-layout">
+          <aside class="deck-list">
+            <div class="deck-list-header">
+              <h3>Decks</h3>
+              <button id="createDeckButton" type="button" class="primary-button">Neues Deck</button>
+            </div>
+            <ul id="deckList" class="deck-items"></ul>
+          </aside>
+          <section class="deck-detail" aria-live="polite">
+            <div id="deckFeedback" class="feedback" role="status" aria-live="polite"></div>
+            <div id="deckDetail" class="deck-detail-content">
+              <p class="empty-state">Wähle ein Deck oder lege ein neues an.</p>
+            </div>
+          </section>
+        </div>
+      </article>
+    </section>
+
+    <section id="exportSection" class="view" data-section="export" hidden>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Export &amp; Backups</h2>
+          <p>Lade deine Daten für Versicherung, Handel oder als Sicherungskopie herunter.</p>
+        </div>
+        <div class="export-actions">
+          <button id="exportCollectionCsvButton" type="button" class="primary-button">Sammlung als CSV</button>
+          <button id="exportWishlistCsvButton" type="button" class="secondary">Wunschliste als CSV</button>
+          <button id="exportDeckListButton" type="button" class="secondary">Decklisten als Text</button>
+          <button id="exportJsonButton" type="button" class="secondary">Vollständiges Backup (JSON)</button>
+          <label class="file-import">
+            <input id="importJsonInput" type="file" accept="application/json">
+            <span>Backup importieren</span>
+          </label>
+        </div>
+        <div id="exportFeedback" class="feedback" role="status" aria-live="polite"></div>
+      </article>
+    </section>
+
+    <section id="settingsSection" class="view" data-section="settings" hidden>
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Einstellungen</h2>
+          <p>Passe Darstellung, Währungen und Bewertungsmethoden an.</p>
+        </div>
+        <form id="settingsForm" class="settings-grid">
+          <label class="form-row">
+            <span>Theme</span>
+            <select id="themeSelect" name="theme">
+              <option value="dark">Dunkel</option>
+              <option value="light">Hell</option>
+              <option value="system">System</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Bevorzugte Währung</span>
+            <select id="currencySelect" name="currency">
+              <option value="EUR">Euro (EUR)</option>
+              <option value="USD">US-Dollar (USD)</option>
+              <option value="GBP">Britisches Pfund (GBP)</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Bewertungsmethode</span>
+            <select id="valuationModeSelect" name="valuation">
+              <option value="average">Durchschnittspreis</option>
+              <option value="lowest">Niedrigster Preis</option>
+              <option value="highest">Höchster Preis</option>
+            </select>
+          </label>
+          <label class="form-row">
+            <span>USD → EUR</span>
+            <input id="usdRateInput" name="usdRate" type="number" step="0.0001" min="0" placeholder="0.92">
+          </label>
+          <label class="form-row">
+            <span>GBP → EUR</span>
+            <input id="gbpRateInput" name="gbpRate" type="number" step="0.0001" min="0" placeholder="1.16">
+          </label>
+          <label class="form-row">
+            <span>Preisupdate Intervall (Tage)</span>
+            <input id="priceIntervalInput" name="priceInterval" type="number" min="1" max="30" placeholder="7">
+          </label>
+          <label class="form-row form-row-wide">
+            <span>Notizen</span>
+            <textarea id="settingsNotes" name="notes" placeholder="Platz für persönliche Abläufe, z. B. Versicherungsanforderungen"></textarea>
+          </label>
+        </form>
+        <div class="settings-actions">
+          <button id="updatePricesButton" type="button" class="primary-button">Preise aktualisieren</button>
+          <button id="resetSettingsButton" type="button" class="secondary">Einstellungen zurücksetzen</button>
+          <button id="clearDataButton" type="button" class="secondary danger">Alle Daten löschen</button>
+        </div>
+        <div id="settingsFeedback" class="feedback" role="status" aria-live="polite"></div>
+      </article>
     </section>
   </main>
 
   <footer class="app-footer">
-    <p>Pokémon und Pokémon TCG sind Marken von Nintendo, Creatures und GAME FREAK. Diese App nutzt die <a href="https://pokemontcg.io" target="_blank" rel="noreferrer">Pokémon TCG API</a>.</p>
+    <p>Pokémon und Pokémon TCG sind Marken von Nintendo, Creatures und GAME FREAK. Pokefolio nutzt die <a href="https://pokemontcg.io" target="_blank" rel="noreferrer">Pokémon TCG API</a> und lokale Speicherung, um deine Daten offline verfügbar zu machen.</p>
   </footer>
 
-  <template id="cardTemplate">
-    <article class="card">
+  <dialog id="cardEditorDialog">
+    <form id="cardEditorForm" method="dialog">
+      <header class="dialog-header">
+        <h2 id="cardEditorTitle">Karte hinzufügen</h2>
+        <button type="button" class="secondary" data-dialog-close>Schließen</button>
+      </header>
+      <div class="dialog-body">
+        <div class="card-preview">
+          <img id="cardEditorImage" alt="">
+          <div>
+            <h3 id="cardEditorName"></h3>
+            <p id="cardEditorInfo"></p>
+            <p id="cardEditorPrices" class="dialog-prices"></p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Menge</span>
+            <input type="number" id="cardQuantityInput" name="quantity" min="1" value="1" required>
+          </label>
+          <label>
+            <span>Zustand</span>
+            <select id="cardConditionSelect" name="condition"></select>
+          </label>
+          <label>
+            <span>Sprache</span>
+            <select id="cardLanguageSelect" name="language"></select>
+          </label>
+          <label>
+            <span>Edition</span>
+            <select id="cardEditionSelect" name="edition">
+              <option value="standard">Standard</option>
+              <option value="first">1st Edition</option>
+              <option value="shadowless">Shadowless</option>
+              <option value="promo">Promo</option>
+            </select>
+          </label>
+          <label>
+            <span>Kaufpreis</span>
+            <input type="number" id="purchasePriceInput" name="purchasePrice" min="0" step="0.01" placeholder="z. B. 24.99">
+          </label>
+          <label>
+            <span>Kaufdatum</span>
+            <input type="date" id="purchaseDateInput" name="purchaseDate">
+          </label>
+          <label>
+            <span>Zielpreis / Alarm</span>
+            <input type="number" id="targetPriceInput" name="targetPrice" min="0" step="0.01" placeholder="Optional">
+          </label>
+          <label>
+            <span>Priorität</span>
+            <select id="prioritySelect" name="priority">
+              <option value="high">Must Have</option>
+              <option value="medium">Wichtig</option>
+              <option value="low">Nice to Have</option>
+            </select>
+          </label>
+          <label class="form-row-wide">
+            <span>Notizen</span>
+            <textarea id="cardNotesInput" name="notes" placeholder="z. B. signiert, PSA 9, erhalten bei Turnier"></textarea>
+          </label>
+        </div>
+      </div>
+      <footer class="dialog-actions">
+        <button type="submit" value="save" class="primary-button">Speichern</button>
+      </footer>
+      <input type="hidden" id="cardEditorMode" name="mode" value="collection">
+      <input type="hidden" id="cardEditorCardId" name="cardId">
+    </form>
+  </dialog>
+
+  <dialog id="deckPickerDialog">
+    <form id="deckPickerForm" method="dialog">
+      <header class="dialog-header">
+        <h2>Karte zum Deck hinzufügen</h2>
+        <button type="button" class="secondary" data-dialog-close>Schließen</button>
+      </header>
+      <div class="dialog-body">
+        <p id="deckPickerCardInfo"></p>
+        <label>
+          <span>Deck auswählen</span>
+          <select id="deckPickerSelect" name="deckId"></select>
+        </label>
+        <label>
+          <span>Menge</span>
+          <input type="number" id="deckPickerQuantity" name="quantity" min="1" max="4" value="1">
+        </label>
+        <label>
+          <span>Kategorie</span>
+          <select id="deckPickerCategory" name="category">
+            <option value="main">Hauptdeck</option>
+            <option value="side">Sideboard</option>
+            <option value="extra">Extra Slot</option>
+          </select>
+        </label>
+      </div>
+      <footer class="dialog-actions">
+        <button type="submit" value="save" class="primary-button">Hinzufügen</button>
+      </footer>
+      <input type="hidden" id="deckPickerCardId" name="cardId">
+    </form>
+  </dialog>
+
+  <dialog id="deckEditorDialog">
+    <form id="deckEditorForm" method="dialog">
+      <header class="dialog-header">
+        <h2 id="deckEditorTitle">Deck anlegen</h2>
+        <button type="button" class="secondary" data-dialog-close>Schließen</button>
+      </header>
+      <div class="dialog-body">
+        <label>
+          <span>Deckname</span>
+          <input type="text" id="deckNameInput" name="name" required placeholder="z. B. Lugia VSTAR">
+        </label>
+        <label>
+          <span>Format</span>
+          <select id="deckFormatSelect" name="format">
+            <option value="standard">Standard</option>
+            <option value="expanded">Expanded</option>
+            <option value="unlimited">Unlimited</option>
+            <option value="gym">Gym Leader Challenge</option>
+          </select>
+        </label>
+        <label>
+          <span>Notizen</span>
+          <textarea id="deckNotesInput" name="notes" placeholder="Strategie, Turnierergebnisse, etc."></textarea>
+        </label>
+      </div>
+      <footer class="dialog-actions">
+        <button type="submit" value="save" class="primary-button">Speichern</button>
+      </footer>
+      <input type="hidden" id="deckEditorId" name="deckId">
+    </form>
+  </dialog>
+
+  <template id="cardResultTemplate">
+    <article class="card" data-card-id="">
       <div class="card-image-wrapper">
-        <img alt="" class="card-image" loading="lazy">
+        <img class="card-image" alt="" loading="lazy">
+        <div class="card-badges"></div>
       </div>
       <div class="card-body">
         <h3 class="card-title"></h3>
         <p class="card-subtitle"></p>
-        <p class="card-meta"></p>
+        <ul class="card-meta"></ul>
+        <p class="card-price"></p>
       </div>
       <div class="card-actions">
-        <button class="primary-button add-button">Zur Sammlung</button>
-        <a class="secondary details-link" target="_blank" rel="noreferrer">Details</a>
+        <button type="button" class="primary-button" data-action="add-to-collection">Zur Sammlung</button>
+        <button type="button" class="secondary" data-action="add-to-wishlist">Zur Wunschliste</button>
+        <button type="button" class="secondary" data-action="add-to-deck">Zum Deck</button>
+        <a class="details-link" target="_blank" rel="noreferrer">Details</a>
       </div>
     </article>
+  </template>
+
+  <template id="collectionItemTemplate">
+    <article class="card collection-card" data-card-id="">
+      <div class="card-image-wrapper">
+        <img class="card-image" alt="" loading="lazy">
+        <div class="card-badges"></div>
+      </div>
+      <div class="card-body">
+        <h3 class="card-title"></h3>
+        <p class="card-subtitle"></p>
+        <ul class="card-meta"></ul>
+        <p class="card-price"></p>
+        <p class="card-notes"></p>
+      </div>
+      <div class="card-actions">
+        <button type="button" class="secondary" data-action="edit-entry">Bearbeiten</button>
+        <button type="button" class="secondary" data-action="update-price">Preis aktualisieren</button>
+        <button type="button" class="secondary" data-action="add-to-deck">Zum Deck</button>
+        <button type="button" class="secondary danger" data-action="remove-entry">Entfernen</button>
+      </div>
+    </article>
+  </template>
+
+  <template id="wishlistItemTemplate">
+    <article class="card wishlist-card" data-card-id="">
+      <div class="card-image-wrapper">
+        <img class="card-image" alt="" loading="lazy">
+        <div class="card-badges"></div>
+      </div>
+      <div class="card-body">
+        <h3 class="card-title"></h3>
+        <p class="card-subtitle"></p>
+        <ul class="card-meta"></ul>
+        <p class="card-price"></p>
+        <p class="card-target"></p>
+      </div>
+      <div class="card-actions">
+        <button type="button" class="primary-button" data-action="move-to-collection">In Sammlung übernehmen</button>
+        <button type="button" class="secondary" data-action="edit-wishlist">Bearbeiten</button>
+        <button type="button" class="secondary danger" data-action="remove-wishlist">Entfernen</button>
+      </div>
+    </article>
+  </template>
+
+  <template id="deckListItemTemplate">
+    <li class="deck-item" data-deck-id="">
+      <button type="button" class="deck-select-button"></button>
+      <div class="deck-meta"></div>
+      <div class="deck-actions">
+        <button type="button" data-action="edit-deck">Bearbeiten</button>
+        <button type="button" data-action="delete-deck" class="danger">Löschen</button>
+      </div>
+    </li>
+  </template>
+  
+  <template id="alertTemplate">
+    <div class="alert" data-card-id="">
+      <strong class="alert-title"></strong>
+      <p class="alert-message"></p>
+    </div>
   </template>
 </body>
 </html>
